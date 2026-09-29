@@ -1,35 +1,37 @@
-# Phase 3: Agentic BI Implementation
+# Phase 3: Prompt-Driven Agentic BI Dashboard
 
 ## 1. Objective
 
-Build the conversational analytics experience that can interpret business questions, resolve them to semantic metrics, execute the correct query, and render analytical visuals. This phase brings together the lakehouse, semantic layer, and AI reasoning stack into an Agentic BI workflow.
+Build a small local prompt-driven analytics dashboard. A lightweight Python agent uses OpenAI tool calls to discover Gold metadata and request bounded aggregate data from the completed Phase 2 REST API, then returns an insight and a validated Vega-Lite chart.
 
 ## 2. Scope
 
 This phase includes:
 
 - natural-language business question handling
-- semantic catalog discovery
-- query orchestration and metric resolution
+- Phase 2 Gold catalogue/field discovery
+- query orchestration through the Phase 2 REST API only
 - chart spec generation
-- dynamic dashboard widget rendering
+- one prompt-generated chart at a time in a simple dashboard
 - AI-driven insights and summaries
+
+Keep this increment deliberately small: one local Python service and a static HTML/CSS/JavaScript dashboard. LangGraph, Next.js, Cube, MCP, user-managed chart canvases, and multiple movable/resizable widgets are deferred. The agent uses Gold fields and generic aggregates; it does not add a separate semantic metric layer.
 
 ### Local Runtime and LLM Provider
 
-1. Run the LangGraph agent and Next.js frontend as native local processes; Docker, Docker Compose, WSL, and a container runtime are not prerequisites.
+1. Run the Python agent/API and static dashboard as a native local process; Docker, Docker Compose, WSL, and a container runtime are not prerequisites.
 2. Use the OpenAI API as the PoC LLM provider. Model inference requires network access and an approved API key supplied through local environment configuration.
 3. Do not commit API keys or send sensitive, confidential, or identifying source data to the LLM provider. Keep lakehouse storage and DuckDB query execution local.
-4. Document the local service endpoints and startup order for the frontend, agent, and semantic layer.
+4. The agent shall call only the Phase 2 local Gold REST API for dataset discovery and data access. Bind the Phase 3 service to `127.0.0.1`; document startup order and local endpoints.
 
-## 2.1 Two-Developer Stories, Units, and Handoffs
+## 2.1 Single-Engineer Stories, Units, and Handoffs
 
 | Story | User story outcome | Unit(s) | Owner | Dependency / acceptance handoff |
 |---|---|---|---|---|
-| P3-US-1 | As a business user, I can ask an analytics question and receive a governed, interpretable result. | P3-U1: catalog discovery, intent/metric resolution, query orchestration, and agent flow | Developer A | Depends on Phase 2 interfaces. Agree the agent request/result/error contract with Developer B; verify representative sales, customer, and inventory questions use governed metrics and handle invalid/ambiguous requests. |
-| P3-US-2 | As a business user, I can see and arrange dynamically generated visualizations with concise insights. | P3-U2: chat/canvas, Vega-Lite rendering, and widget interactions; P3-U3: UI and end-to-end integration checks | Developer B | Consume the agreed agent result/spec contract; verify valid declarative specs render, supported interactions work, and errors are presented clearly. |
+| P3-US-1 | As a business user, I can ask an analytics question and receive an interpretable result from Gold data. | P3-U1: OpenAI tool-calling flow over the Phase 2 API | One data engineer | Verify metadata discovery, bounded aggregate queries, and clear handling of unsupported questions. |
+| P3-US-2 | As a business user, I can view a generated chart and concise insight for my question. | P3-U1: prompt dashboard and Vega-Lite rendering | One data engineer | Verify generated specs use returned fields only and errors are visible. |
 
-**Integration gate:** Agree the agent-to-UI payload, chart-spec constraints, and error states before parallel implementation. Integrate against the live semantic interface and validate the complete question-to-visualization path for all three business domains before Phase 3 acceptance.
+**Integration gate:** Use the stable Phase 2 REST contract. Validate the question-to-visualization path for sales, customer segments/regions, and inventory; unsupported forecasts must be identified as unavailable rather than invented.
 
 ## 3. Functional Requirements
 
@@ -41,15 +43,15 @@ This phase includes:
 
 ### P3-FR-2: Catalog Resolution
 
-1. The agent shall inspect semantic metadata before generating or executing a query.
-2. The system shall map business terms such as revenue, forecast, inventory, customer segment, and product category to the correct semantic objects.
-3. Ambiguous requests shall be resolved using available metadata and default business logic.
+1. The agent shall inspect the Phase 2 dataset catalogue and field metadata before querying.
+2. The agent shall map business terms to available Gold fields and documented relationships; it shall not invent absent measures or datasets.
+3. Ambiguous requests shall be clarified briefly or answered with the available metadata; unsupported requests, including forecasts without Gold forecast data, shall be declined clearly.
 
 ### P3-FR-3: Query Execution
 
-1. The agent shall use the semantic layer to retrieve the correct metric data.
-2. The system shall execute approved metric queries without bypassing semantic governance.
-3. Query execution shall support sales, customer, and inventory-driven questions.
+1. The agent shall use only the Phase 2 REST API for Gold catalogue and data access.
+2. The API shall receive bounded aggregate queries; Phase 3 shall not execute SQL or read Parquet directly.
+3. Query execution shall support sales, customer-segment/region, and inventory questions using available Gold fields and approved joins.
 
 ### P3-FR-4: Visualization Generation
 
@@ -57,16 +59,15 @@ This phase includes:
 2. Generated visualizations shall support:
    - trend charts
    - bar charts
-   - KPI cards
    - comparison charts
    - segmentation views
-3. Visualization generation shall not require hardcoded chart implementations for standard business visuals.
+3. Visualization generation shall not require hardcoded chart implementations for standard business visuals. KPI cards and multi-chart output are deferred.
 
 ### P3-FR-5: Dynamic Dashboard Experience
 
-1. The frontend shall render chart widgets dynamically within a user interface canvas.
-2. Users shall be able to resize, move, and close chart widgets.
-3. Generated outputs shall be compatible with the conversational BI view and the static dashboard view.
+1. The frontend shall render one validated Vega-Lite chart for the latest prompt response.
+2. This increment does not require move/resize/close widget interactions or a multi-chart canvas.
+3. Chart encodings shall reference only fields returned by the Phase 2 API; reject arbitrary URLs, expressions, and unsupported marks.
 
 ### P3-FR-6: Insight Summary
 
@@ -78,21 +79,20 @@ This phase includes:
 
 The Agentic BI workflow shall support:
 
-- "Show monthly sales by region."
-- "Forecast revenue for the next quarter."
+- "Show daily net sales by region for the last month."
 - "Which customer segment contributed the most net revenue?"
 - "Which products are running low on inventory and high in demand?"
-- "Compare sales trend by category across the last six months."
+- "Compare net sales by product category."
 
 ## 5. Acceptance Criteria
 
 The phase is complete when:
 
 1. the user can ask natural-language BI questions
-2. the system resolves questions to valid semantic metrics and dimensions
-3. the result is generated via the semantic layer and rendered as a visualization
+2. the agent discovers Gold metadata and queries only through the Phase 2 API
+3. a valid result is rendered as a visualization and unsupported/ambiguous requests are handled clearly
 4. insight summaries are presented to the user
-5. sales, customer, and inventory use cases are all supported in the conversational UI
+5. sales, customer-segment/region, and inventory use cases are supported in the prompt dashboard; forecast requests are not fabricated
 6. the agent can call the OpenAI API using locally configured credentials without exposing the key in source control
 
 ## 6. Deliverables

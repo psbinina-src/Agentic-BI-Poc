@@ -29,6 +29,7 @@ def build_gold(config: GoldConfig) -> dict[str, duckdb.DuckDBPyRelation]:
             l.product_id,
             o.customer_id,
             CAST(o.order_date AS DATE) AS order_date,
+            o.channel,
             l.quantity,
             l.unit_price,
             l.discount_rate,
@@ -37,9 +38,11 @@ def build_gold(config: GoldConfig) -> dict[str, duckdb.DuckDBPyRelation]:
             (l.quantity * l.unit_price * (1 - l.discount_rate)) AS net_sales_amount
         FROM l
         JOIN o ON l.order_id = o.order_id
+        WHERE o.order_status = 'Completed'
         """
     )
     sales.write_parquet(str(gold_dir / "sales_gold.parquet"))
+    con.register("sales", sales)
 
     customers_gold = customers.select(
         "customer_id",
@@ -61,24 +64,41 @@ def build_gold(config: GoldConfig) -> dict[str, duckdb.DuckDBPyRelation]:
     )
     products_gold.write_parquet(str(gold_dir / "products_gold.parquet"))
 
-    con.register("inventory", inventory)
     inventory_gold = con.sql(
         """
+        WITH inventory_velocity AS (
+            SELECT
+                CAST(i.snapshot_date AS DATE) AS snapshot_date,
+                i.product_id,
+                i.inventory_on_hand,
+                i.reorder_point,
+                CAST(COALESCE(SUM(s.quantity), 0) AS DOUBLE) / 30.0 AS sales_velocity_units_per_day
+            FROM inventory i
+            LEFT JOIN sales s
+                ON s.product_id = i.product_id
+                AND s.order_date >= CAST(i.snapshot_date AS DATE) - INTERVAL '30 days'
+                AND s.order_date < CAST(i.snapshot_date AS DATE)
+            GROUP BY i.snapshot_date, i.product_id, i.inventory_on_hand, i.reorder_point
+        )
         SELECT
             snapshot_date,
             product_id,
             inventory_on_hand,
             reorder_point,
+            sales_velocity_units_per_day,
             CASE
-                WHEN reorder_point IS NULL OR reorder_point = 0 THEN NULL
-                ELSE CAST(inventory_on_hand / reorder_point AS DOUBLE)
+                WHEN sales_velocity_units_per_day = 0 THEN 0.0
+                ELSE CAST(inventory_on_hand AS DOUBLE) / sales_velocity_units_per_day
             END AS stock_coverage_days,
+            CASE
+                WHEN sales_velocity_units_per_day = 0 THEN 'no_demand'
+                ELSE 'calculated'
+            END AS stock_coverage_status,
             CASE
                 WHEN inventory_on_hand <= reorder_point THEN TRUE
                 ELSE FALSE
-            END AS low_stock_flag,
-            CAST(inventory_on_hand AS DOUBLE) AS inventory_velocity
-        FROM inventory
+            END AS low_stock_flag
+        FROM inventory_velocity
         """
     )
     inventory_gold.write_parquet(str(gold_dir / "inventory_gold.parquet"))

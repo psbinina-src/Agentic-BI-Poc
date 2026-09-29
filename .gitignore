@@ -3,6 +3,12 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+node_modules/
+.cube-spike/
+.local/
+.env
+.env.*
+!.env.example
 
 # Test and coverage output
 .pytest_cache/

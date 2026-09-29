@@ -1,0 +1,2 @@
+    EnvVarError: env-var: "CUBEJS_DEV_MODE" should be either "true", "false", 
+    "TRUE", or "FALSE"

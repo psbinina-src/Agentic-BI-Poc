@@ -1,0 +1,16 @@
+{
+  "name": "agentic-bi-cube-semantic-layer",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Local Cube Core semantic model for Agentic BI Phase 2",
+  "scripts": {
+    "start": "cubejs-server server"
+  },
+  "devDependencies": {
+    "@cubejs-backend/duckdb-driver": "1.7.47",
+    "@cubejs-backend/server": "1.7.47"
+  },
+  "allowScripts": {
+    "@cubejs-backend/native@1.7.47": true
+  }
+}

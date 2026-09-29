@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Ask questions about local Gold sales, customers, products, and inventory." />
+    <title>Gold Data Intelligence</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Gold Data Intelligence home">
+        <span class="brand-mark">G</span>
+        <span>Gold<span class="brand-light"> Intelligence</span></span>
+      </a>
+      <div class="connection"><span class="connection-dot"></span><span id="connection-label">Local data workspace</span></div>
+    </header>
+
+    <main class="shell">
+      <section class="intro">
+        <div class="eyebrow">ANALYTICS, IN PLAIN LANGUAGE</div>
+        <h1>Ask your data<br /><span>what matters.</span></h1>
+        <p class="intro-copy">Explore sales, customers, products, and inventory. Your question becomes a Gold data query, a clear takeaway, and a chart.</p>
+      </section>
+
+      <section class="workspace" aria-label="Analytics assistant">
+        <div class="prompt-card">
+          <label for="question">What would you like to understand?</label>
+          <textarea id="question" rows="3" maxlength="1000" placeholder="e.g. Show monthly net sales by region"></textarea>
+          <div class="prompt-footer">
+            <span class="privacy-note"><span aria-hidden="true">⌂</span> Gold data stays local; only aggregate results are sent for analysis.</span>
+            <button id="ask-button" type="button"><span>Analyze</span><span aria-hidden="true">↗</span></button>
+          </div>
+        </div>
+
+        <div class="suggestions" aria-label="Suggested questions">
+          <button class="suggestion" type="button">Daily net sales by region during December 2025</button>
+          <button class="suggestion" type="button">Net sales by customer segment</button>
+          <button class="suggestion" type="button">Count low-stock products with positive demand by category on 2025-12-31</button>
+        </div>
+
+        <div id="status" class="status" role="status" aria-live="polite"></div>
+
+        <section id="result" class="result hidden" aria-live="polite">
+          <div class="result-heading">
+            <div>
+              <div class="eyebrow">ANALYSIS</div>
+              <h2 id="answer"></h2>
+            </div>
+            <button id="clear-button" class="clear-button" type="button" aria-label="Clear result">Clear</button>
+          </div>
+          <article class="insight-card">
+            <div class="insight-icon" aria-hidden="true">✦</div>
+            <div><div class="insight-label">KEY TAKEAWAY</div><p id="insight"></p></div>
+          </article>
+          <article id="chart-card" class="chart-card hidden">
+            <div id="chart" class="chart"></div>
+          </article>
+          <details class="data-details">
+            <summary>View aggregated data</summary>
+            <div class="table-scroll"><table><thead id="data-head"></thead><tbody id="data-body"></tbody></table></div>
+          </details>
+          <p class="footnote">Results come from local Gold datasets through the Phase 2 API.</p>
+        </section>
+
+        <footer class="page-footer"><span>Local Gold model</span><span>Sales · Customers · Products · Inventory</span></footer>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

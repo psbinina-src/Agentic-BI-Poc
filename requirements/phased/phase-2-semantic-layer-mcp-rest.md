@@ -1,123 +1,76 @@
-# Phase 2: Semantic Layer Implementation
+# Phase 2: Local Gold Data REST API
 
 ## 1. Objective
 
-Implement the business semantic layer on top of the lakehouse Gold model so that analytics consumers can access governed metrics through standard interfaces. This phase creates the metric layer that provides a single source of truth for BI, dashboards, and AI query interpretation.
+Expose the existing Phase 1 Gold data model through a small, local, read-only REST API. The API provides catalogue discovery, dataset and field details, and bounded data access for a simple Phase 3 Agentic BI application. It does not create a separate semantic layer or redefine Gold measures.
 
 ## 2. Scope
 
 This phase covers:
 
-- metric definitions for sales, customer, and inventory analytics
-- semantic modeling over the Gold layer
-- REST API exposure for programmatic integration
-- MCP support for agentic consumption
-- SQL-compatible access for traditional BI validation
+- catalogue discovery for the sales, customer, product, and inventory Gold datasets
+- dataset grain, key, field name, type, and field description metadata
+- a local REST API for validated, read-only dataset queries
+- a stable JSON contract for Phase 3 agent/tool integration
+- focused tests and simple local run instructions
+
+Cube, MCP, SQL/BI connectivity, a second semantic model, authentication for remote use, and production hosting are out of scope. Any existing Cube prototype is not part of this API's runtime or data-access path.
 
 ### Local Runtime
 
-1. Run Cube Core as a native local service; Docker, Docker Compose, WSL, and a container runtime are not prerequisites.
-2. Configure the semantic service to read the locally stored Gold-layer data through DuckDB, and document the local data path and service endpoints.
+Run the Python API as a native local process, bound to `127.0.0.1`. DuckDB reads the existing Gold Parquet files directly; Docker, Cube, WSL, external databases, and hosted services are not prerequisites.
 
 ## 2.1 Two-Developer Stories, Units, and Handoffs
 
-| Story | User story outcome | Unit(s) | Owner | Dependency / acceptance handoff |
+| Story | User story outcome | Unit | Owner | Dependency / acceptance handoff |
 |---|---|---|---|---|
-| P2-US-1 | As an analytics consumer, I can discover governed metrics and dimensions over the Gold model. | P2-U1: Cube model, Gold-to-semantic mapping, and metric catalog | Developer A | Agree the Gold schema, grain, and metric definitions; verify catalog metadata and representative metric queries, then publish stable semantic names and definitions. |
-| P2-US-2 | As an agent or BI consumer, I can access the same governed metrics through supported interfaces. | P2-U2: REST, MCP, and SQL interfaces; P2-U3: cross-interface parity checks and setup examples | Developer B | Build against the agreed semantic contract; verify supported endpoint/query examples and equivalent results across available interfaces; publish endpoint and parity evidence for Phases 3 and 4. |
+| P2-US-1 | As an analytics consumer, I can discover the Gold datasets, their grains, keys, and fields. | P2-U1: Gold contract and catalogue metadata | One data engineer | Use the Phase 1 Gold contract; verify metadata against the Parquet schemas. |
+| P2-US-2 | As a Phase 3 agent, I can retrieve bounded, validated data from Gold through a local REST interface. | P2-U2: Local Gold REST API | One data engineer | Query only the four allowlisted Gold datasets; verify filtering, grouping, aggregates, limits, and response shape. |
 
-**Integration gate:** Finalize the Gold mapping and semantic naming contract before interface integration. Developer A provides representative expected results; Developer B exercises the interfaces against those results. Phase 2 is accepted only after the interfaces start using the documented native setup and parity checks pass.
+**Integration gate:** Validate catalogue and query responses against the actual Gold Parquet schemas and representative DuckDB results. Phase 3 consumes this documented local API contract.
 
 ## 3. Functional Requirements
 
-### P2-FR-1: Semantic Metric Definitions
+### P2-FR-1: Gold Catalogue and Dataset Metadata
 
-1. The system shall define metrics in a version-controlled semantic layer.
-2. The semantic layer shall include standardized definitions for:
-   - sales revenue
-   - units sold
-   - order volume
-   - customer contribution
-   - forecast measures
-   - inventory health measures
-3. Measures shall be built using the Gold layer as the source of truth.
-4. The semantic model shall distinguish between fact measures and descriptive attributes.
+1. `GET /catalog` shall list the four Gold datasets, availability, descriptions, grains, key fields, and approved relationships.
+2. `GET /catalog/{dataset}` shall return the dataset grain, key fields, and each physical field's name, DuckDB type, and description.
+3. Field names and types shall be discovered from the Gold Parquet schema; catalogue descriptions shall explain the existing Phase 1 model without redefining its measures.
 
-### P2-FR-2: Data Modeling for Semantic Queries
+### P2-FR-2: Bounded Gold Data Access
 
-1. The semantic layer shall expose dimensions and facts for:
-   - time
-   - customer
-   - product
-   - category/subcategory
-   - region
-   - inventory and stock state
-2. The semantic layer shall support drill-down and roll-up queries across business dimensions.
-3. The model shall support all BI questions required by the PoC use cases.
+1. `POST /query` shall read only the allowlisted Gold Parquet datasets and support field selection, validated filters, optional grouping, and basic field aggregations.
+2. Query fields, grouping fields, filters, and aggregation inputs shall be checked against the selected dataset's physical schema.
+3. Queries may join only relationships documented in the Gold catalogue; join keys and join types are fixed by the API, not supplied by the request.
+4. Filter values shall be parameterized; request bodies shall not accept SQL text, file paths, database names, arbitrary table identifiers, or join expressions.
+5. Query results shall default to 100 rows and have a hard maximum of 500 rows.
+6. The API shall expose raw Gold fields and generic aggregations only; it shall not claim to provide governed business metric definitions.
 
-### P2-FR-3: API Integration
+### P2-FR-3: Local REST Contract
 
-1. The semantic layer shall expose a REST API for querying catalog metadata and metric results.
-2. The REST interface shall provide structured responses suitable for downstream AI agents and applications.
-3. The semantic layer shall expose metadata describing measures, dimensions, filters, and joins.
-4. All API responses shall be consistent with the underlying Gold-layer definitions.
-
-### P2-FR-4: MCP Integration
-
-1. The system shall support MCP-based integration for AI agents to discover and query metrics.
-2. The MCP interface shall allow a conversational agent to access semantic metadata and execute governed analytical queries.
-3. The MCP layer shall be restricted to validated semantic definitions and approved data access patterns.
-
-### P2-FR-5: Traditional BI Connectivity
-
-1. The semantic layer shall expose a SQL-compatible interface for tools such as Metabase.
-2. The SQL layer shall serve the same metric logic used by AI-driven queries.
-3. Traditional BI consumers shall be able to validate the same results as the Agentic BI front end.
-
-### P2-FR-6: Metric Consistency
-
-1. The system shall ensure that identical filters and measures return consistent results across API, MCP, and SQL interfaces.
-2. Metric definitions shall be centrally controlled to avoid divergence between business intelligence tools.
+1. The API shall provide `GET /health`, `GET /catalog`, `GET /catalog/{dataset}`, and `POST /query` JSON endpoints.
+2. The default server configuration shall bind to `127.0.0.1`; no remote exposure or firewall changes are allowed in this PoC.
+3. API errors shall be structured and shall not expose local file paths or internal stack traces.
+4. The API shall not send data to an external service. Phase 3 is responsible for selecting the minimum query result needed for any downstream model prompt.
 
 ## 4. Semantic Use Cases
 
-### Sales Analytics
-
-- total sales by region
-- trend by month and quarter
-- product category contribution
-- forecast vs actual comparison
-
-### Customer Analytics
-
-- customer segment performance
-- customer contribution ranking
-- region-based customer profile analysis
-- repeat customer behavior
-
-### Inventory Analytics
-
-- stock coverage by product and category
-- inventory health summary
-- product demand vs available stock
-- low-stock and high-velocity product analysis
+The API supports Phase 3 discovery and retrieval over sales, customers, products, and inventory. Phase 3 chooses fields and filters, then interprets returned rows or generic grouped aggregates. Forecast data is not exposed unless present in the Gold model.
 
 ## 5. Acceptance Criteria
 
 The phase is complete when:
 
-1. semantic definitions exist for the required BI use cases
-2. the semantic layer exposes REST and/or MCP endpoints
-3. SQL-driven BI validation is possible against the same semantic layer
-4. metric outputs match across consumers for equivalent requests
-5. the layer is ready for Agentic BI integration
-6. Cube Core starts and serves its required interfaces using the documented native local setup
+1. all four Gold datasets appear in the catalogue with accurate grain, key, and relationship metadata
+2. dataset detail endpoints expose actual Parquet field names and DuckDB types
+3. bounded queries support projection, validated filters, grouping, and generic aggregates
+4. invalid datasets, fields, unsafe request shapes, and excessive row limits are rejected
+5. tests compare API results with direct DuckDB reads of synthetic Gold fixtures
+6. the service starts locally on loopback and is documented for Phase 3 consumption
 
 ## 6. Deliverables
 
-- semantic metric catalog
-- model definitions for measures/dimensions
-- REST integration layer
-- MCP integration layer
-- SQL endpoint configuration for BI validation
-- validation report proving metric parity
+- local Gold catalogue and dataset schema endpoints
+- bounded read-only data query endpoint
+- API tests and Phase 3 integration contract
+- local setup and run documentation

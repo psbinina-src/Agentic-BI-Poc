@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Product Sales &amp; Inventory Monitor</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">COMMERCIAL PERFORMANCE</p>
+        <h1 id="dashboard-title">Product Sales &amp; Inventory Monitor</h1>
+      </div>
+      <div class="badge">Local Gold + semantic view</div>
+    </header>
+
+    <main class="container">
+      <section class="panel filters-panel">
+        <div class="panel-header">
+          <h2>Filter the Gold model</h2>
+        </div>
+        <div class="filter-grid">
+          <label>
+            Start date
+            <input id="start-date" type="date" />
+          </label>
+          <label>
+            End date
+            <input id="end-date" type="date" />
+          </label>
+          <label>
+            Product
+            <select id="product-filter"></select>
+          </label>
+          <label>
+            Customer
+            <select id="customer-filter"></select>
+          </label>
+        </div>
+        <div class="filter-actions">
+          <button id="reset-filters" type="button">Reset</button>
+        </div>
+      </section>
+
+      <section class="kpis" id="kpis"></section>
+
+      <section class="panel semantic-panel">
+        <div class="panel-header">
+          <h2>Gold data model semantic view</h2>
+        </div>
+        <div id="semantic-view" class="semantic-grid"></div>
+      </section>
+
+      <section class="chart-grid">
+        <article class="panel chart-panel">
+          <div class="panel-header">
+            <h2>Revenue by region</h2>
+          </div>
+          <canvas id="regionChart"></canvas>
+        </article>
+
+        <article class="panel chart-panel">
+          <div class="panel-header">
+            <h2>Sales by channel</h2>
+          </div>
+          <canvas id="channelChart"></canvas>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Daily sales trend</h2>
+        </div>
+        <canvas id="trendChart"></canvas>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Inventory risk snapshot</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>On hand</th>
+                <th>Velocity</th>
+                <th>Coverage days</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="inventory-table"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

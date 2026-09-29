@@ -7,14 +7,20 @@ name = "agentic-bi-p1-u1"
 version = "0.1.0"
 description = "Deterministic synthetic e-commerce source generator for Agentic BI Phase 1"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+	"duckdb>=1.4,<2",
+	"fastapi>=0.115,<1",
+	"starlette>=0.46,<1",
+	"uvicorn>=0.34,<1",
+]
 
 [project.optional-dependencies]
-test = ["pytest>=9,<10"]
+test = ["pytest>=9,<10", "httpx>=0.27,<1"]
+phase3 = ["openai>=1.60,<3", "httpx>=0.27,<1", "python-dotenv>=1,<2"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests/p1_u2", "tests/p1_u3", "tests/p1_u4"]
+testpaths = ["tests/p1_u2", "tests/p1_u3", "tests/p1_u4", "tests/p2_u1", "tests/p2_u2", "tests/p3"]
 addopts = "-ra"
