@@ -1,0 +1,7 @@
+AIDLC Execution Quality Gates
+
+ Gate 1 (Semantic Resolution): 100% of benchmark natural language prompts accurately resolve to valid Cube schema measures and dimensions.
+
+ Gate 2 (Canvas Rendering): Agent produces syntactically valid Vega-Lite JSON specs that mount dynamically on the React grid canvas without console errors.
+
+ Gate 3 (Metric Consistency): Automated tests verify identical numeric outputs across the AI Agent interface and Metabase.

@@ -1,0 +1,333 @@
+Domain Specification: E-Commerce Analytics (Star Schema)
+1. Overview & Purpose
+This Domain Specification defines the logical data model, physical schema, metric calculations, and business disambiguation rules for the E-Commerce Analytics domain. Built on a classic dimensional star-schema, this model provides the analytical foundation for both the Agentic BI Canvas (via Cube Core REST/MCP) and Traditional BI (via Metabase SQL API).
+
+2. Schema Topology
+                       ┌─────────────────────────┐
+                       │      dim_products       │
+                       ├─────────────────────────┤
+                       │ PK  product_id          │
+                       │     product_name        │
+                       │     category            │
+                       │     subcategory         │
+                       │     unit_cost           │
+                       └────────────┬────────────┘
+                                    │ 1
+                                    │
+                                    │ N
+┌─────────────────────────┐    ┌────┴────────────────────┐    ┌─────────────────────────┐
+│      dim_customers      │    │       fact_sales        │    │       dim_orders        │
+├─────────────────────────┤    ├─────────────────────────┤    ├─────────────────────────┤
+│ PK  customer_id         ├─1──┤ PK  sales_id            ├─N──┤ PK  order_id            │
+│     customer_name       │    │ FK  customer_id         │    │     order_status        │
+│     customer_segment    │ N  │ FK  product_id          │ 1  │     payment_method      │
+│     region              │    │ FK  order_id            │    └─────────────────────────┘
+└─────────────────────────┘    │     order_date          │
+                               │     quantity            │
+                               │     gross_revenue       │
+                               │     discount_amount     │
+                               └─────────────────────────┘
+3. Data Dictionary
+3.1 Fact Table: fact_sales
+Attribute	Data Type	Key Type	Business Description
+sales_id	VARCHAR	Primary Key	Unique line-item transaction identifier.
+order_id	VARCHAR	Foreign Key	References dim_orders.order_id.
+customer_id	VARCHAR	Foreign Key	References dim_customers.customer_id.
+product_id	VARCHAR	Foreign Key	References dim_products.product_id.
+order_date	TIMESTAMP	Attribute	Date and time the order line item was created.
+quantity	INTEGER	Measure	Number of physical units purchased.
+gross_revenue	DECIMAL(10,2)	Measure	Total monetary revenue prior to discounts.
+discount_amount	DECIMAL(10,2)	Measure	Total promotional discount applied.
+3.2 Dimension Table: dim_customers
+Attribute	Data Type	Key Type	Business Description
+customer_id	VARCHAR	Primary Key	Unique customer identifier.
+customer_name	VARCHAR	Attribute	Customer full name or organizational handle.
+customer_segment	VARCHAR	Attribute	Classification tier (Enterprise, SMB, Consumer).
+region	VARCHAR	Attribute	Geographic region (APAC, NA, EMEA, LATAM).
+3.3 Dimension Table: dim_products
+Attribute	Data Type	Key Type	Business Description
+product_id	VARCHAR	Primary Key	Unique stock keeping unit (SKU) identifier.
+product_name	VARCHAR	Attribute	Commercial product name.
+category	VARCHAR	Attribute	Top-level catalog line (Electronics, Apparel, etc.).
+subcategory	VARCHAR	Attribute	Granular product type (Gadgets, Clothing, etc.).
+unit_cost	DECIMAL(10,2)	Attribute	Cost of goods sold (COGS) per unit.
+3.4 Dimension Table: dim_orders
+Attribute	Data Type	Key Type	Business Description
+order_id	VARCHAR	Primary Key	Unique overall transaction basket identifier.
+order_status	VARCHAR	Attribute	Order state (Completed, Returned, Cancelled).
+payment_method	VARCHAR	Attribute	Payment gateway used (Credit Card, PayPal, etc.).
+4. Business Metrics & Calculations
+Metric Name	Semantic Name	Formula / Aggregation	Business Description
+Gross Revenue	sales.gross_revenue	SUM(gross_revenue)	Raw sales revenue before deductions.
+Total Discount	sales.total_discount	SUM(discount_amount)	Total value of discounts redeemed.
+Net Revenue	sales.net_revenue	gross_revenue - total_discount	Effective net revenue generated.
+Units Sold	sales.total_units_sold	SUM(quantity)	Total count of physical units shipped.
+Order Line Count	sales.order_line_count	COUNT(sales_id)	Count of individual transaction line items.
+Average Order Value (AOV)	sales.average_order_value	net_revenue / COUNT(DISTINCT order_id)	Mean dollar value per completed transaction.
+5. Physical DDL & Mock Data Seed (DuckDB)
+-- 1. Dimension: Customers
+CREATE TABLE dim_customers AS 
+SELECT 
+  'CUST-' || LPAD(CAST(range AS VARCHAR), 5, '0') AS customer_id,
+  'Customer ' || range AS customer_name,
+  ['Enterprise', 'SMB', 'Consumer'][1 + (range % 3)] AS customer_segment,
+  ['APAC', 'NA', 'EMEA', 'LATAM'][1 + (range % 4)] AS region
+FROM range(1, 1001);
+
+-- 2. Dimension: Products
+CREATE TABLE dim_products AS 
+SELECT 
+  'PROD-' || LPAD(CAST(range AS VARCHAR), 4, '0') AS product_id,
+  'Product ' || range AS product_name,
+  ['Electronics', 'Apparel', 'Home & Kitchen', 'Books'][1 + (range % 4)] AS category,
+  ['Gadgets', 'Clothing', 'Cookware', 'Fiction'][1 + (range % 4)] AS subcategory,
+  ROUND(CAST(random() * 80 + 10 AS NUMERIC), 2) AS unit_cost
+FROM range(1, 101);
+
+-- 3. Dimension: Orders
+CREATE TABLE dim_orders AS 
+SELECT 
+  'ORD-' || LPAD(CAST(range AS VARCHAR), 6, '0') AS order_id,
+  ['Completed', 'Completed', 'Completed', 'Returned', 'Cancelled'][1 + (range % 5)] AS order_status,
+  ['Credit Card', 'PayPal', 'Bank Transfer'][1 + (range % 3)] AS payment_method
+FROM range(1, 10001);
+
+-- 4. Fact Table: Sales Line Items
+CREATE TABLE fact_sales AS 
+SELECT 
+  'SALE-' || LPAD(CAST(range AS VARCHAR), 7, '0') AS sales_id,
+  'ORD-' || LPAD(CAST(1 + (range % 10000) AS VARCHAR), 6, '0') AS order_id,
+  'CUST-' || LPAD(CAST(1 + (range % 1000) AS VARCHAR), 5, '0') AS customer_id,
+  'PROD-' || LPAD(CAST(1 + (range % 100) AS VARCHAR), 4, '0') AS product_id,
+  TIMESTAMP '2025-01-01 00:00:00' + INTERVAL (range * 15) MINUTE AS order_date,
+  CAST(random() * 4 + 1 AS INT) AS quantity,
+  ROUND(CAST(random() * 300 + 20 AS NUMERIC), 2) AS gross_revenue,
+  ROUND(CAST(random() * 15 AS NUMERIC), 2) AS discount_amount
+FROM range(1, 50001);
+6. Semantic Layer Schema Definitions (Cube Core)
+6.1 Sales.yml (Fact & Joins)
+cubes:
+  - name: sales
+    sql: SELECT * FROM fact_sales
+
+    joins:
+      - name: customers
+        sql: "{CUBE}.customer_id = {customers.customer_id}"
+        relationship: belongsTo
+
+      - name: products
+        sql: "{CUBE}.product_id = {products.product_id}"
+        relationship: belongsTo
+
+      - name: orders
+        sql: "{CUBE}.order_id = {orders.order_id}"
+        relationship: belongsTo
+
+    measures:
+      - name: gross_revenue
+        type: sum
+        sql: gross_revenue
+        description: "Total sales value before promotional discounts."
+
+      - name: total_discount
+        type: sum
+        sql: discount_amount
+        description: "Total monetary value of applied discounts."
+
+      - name: net_revenue
+        type: number
+        sql: "{gross_revenue} - {total_discount}"
+        description: "Net realized revenue after discounts."
+
+      - name: total_units_sold
+        type: sum
+        sql: quantity
+        description: "Total physical quantity of items sold."
+
+      - name: order_line_count
+        type: count
+        description: "Total count of sales line items."
+
+      - name: average_order_value
+        type: number
+        sql: "{net_revenue} / NULLIF(COUNT(DISTINCT {orders.order_id}), 0)"
+        description: "Average net monetary value per distinct order."
+
+    dimensions:
+      - name: sales_id
+        type: string
+        sql: sales_id
+        primary_key: true
+
+      - name: order_date
+        type: time
+        sql: order_date
+6.2 Dimensions.yml (Dimension Cubes)
+cubes:
+  - name: customers
+    sql: SELECT * FROM dim_customers
+
+    dimensions:
+      - name: customer_id
+        type: string
+        sql: customer_id
+        primary_key: true
+
+      - name: customer_name
+        type: string
+        sql: customer_name
+
+      - name: customer_segment
+        type: string
+        sql: customer_segment
+
+      - name: region
+        type: string
+        sql: region
+
+  - name: products
+    sql: SELECT * FROM dim_products
+
+    dimensions:
+      - name: product_id
+        type: string
+        sql: product_id
+        primary_key: true
+
+      - name: product_name
+        type: string
+        sql: product_name
+
+      - name: category
+        type: string
+        sql: category
+
+      - name: subcategory
+        type: string
+        sql: subcategory
+
+  - name: orders
+    sql: SELECT * FROM dim_orders
+
+    dimensions:
+      - name: order_id
+        type: string
+        sql: order_id
+        primary_key: true
+
+      - name: order_status
+        type: string
+        sql: order_status
+
+      - name: payment_method
+        type: string
+        sql: payment_method
+7. Natural Language Disambiguation Rules
+User Terminology	Candidate Matches	System Mapping Rule	Default Execution Target
+"Sales", "Revenue", "Income"	gross_revenue, net_revenue	Default to net_revenue unless "gross" is specified.	sales.net_revenue
+"Volume", "Units"	total_units_sold, order_line_count	Map to sum of physical quantities.	sales.total_units_sold
+"Region", "Territory"	customers.region	Cross-cube join from sales to customers.	customers.region
+"Product Line", "Category"	products.category, products.subcategory	Map top-level groupings to category.	products.category
+"Order State", "Status"	orders.order_status	Filter orders.order_status = 'Completed' for valid revenue queries.	orders.order_status
+
+
+
+
+
+On Mon, 28 Sep 2026 at 6:44 am, Bina Prajapati <bins.prajapati@gmail.com> wrote:
+Functional Requirements Document (FRD)
+Project: Rapid E2E Agentic BI Proof of Concept (AIDLC)
+1. Document Scope & Architectural Overview
+This Functional Requirements Document (FRD) outlines the user-facing behaviors, operational capabilities, and core functional features required to deliver a rapid End-to-End (E2E) Proof of Concept (PoC) for an Agentic BI Dashboard.
+
+The architecture strictly uses 100% open-source software for storage, semantic modeling, visualization, and traditional BI, with an optional cloud LLM API (e.g., OpenAI gpt-4o-mini) for fast execution without local GPU configuration.
+
+Functional Layer	Technology Selection	Open Source Status	PoC Role
+Storage & Query Engine	DuckDB	100% Open Source	In-process OLAP reading local Parquet/Delta files.
+Headless Semantic Layer	Cube Core	100% Open Source (Apache 2.0)	Governs metrics; exposes REST, Postgres SQL, and MCP.
+Agent Framework	LangGraph (Python)	100% Open Source	Manages the ReAct loop (Catalog \rightarrow Query \rightarrow Viz Spec).
+LLM Brain	OpenAI API / Ollama	Optional (Cloud API vs. Open Weight)	Cloud API (gpt-4o-mini) for rapid setup, or Ollama (qwen2.5-coder) for local.
+Dashboard Canvas	Next.js + react-vega	100% Open Source	Dynamic grid layout rendering declarative Vega-Lite JSON.
+Traditional BI	Metabase Community	100% Open Source	Connects to Cube via Postgres SQL API for metric validation.
+2. Functional Requirements Breakdown
+FR-1: Lakehouse Storage & Engine
+FR-1.1 Data Querying: The system shall read analytical Gold-layer Parquet or Delta Lake files directly from local storage using DuckDB without requiring a cloud data warehouse.
+FR-1.2 Query Speed: The underlying storage engine must execute metric aggregations over local files in under 500 milliseconds for prompt execution speed.
+FR-2: Metric Governance & Multi-Interface Serving
+FR-2.1 Code-First Modeling: Metric definitions, dimensions, joins, and filters must be configured in version-controlled YAML schema files using Cube Core.
+FR-2.2 Multi-Protocol API:
+Must serve a REST API for the AI Agent to perform catalog discovery and retrieve structured JSON data.
+Must serve a Postgres SQL API on port 15432 for traditional BI connections.
+Must expose MCP (Model Context Protocol) endpoints for native agent integration.
+FR-2.3 Metric Consistency: The system must guarantee that a metric request yields identical numeric outputs regardless of whether it is queried via the REST API or the SQL API.
+FR-3: Natural Language Querying & Catalog Resolution
+FR-3.1 Natural Language Parsing: The agent backend shall accept plain-English analytical prompts from the user interface.
+FR-3.2 Catalog Disambiguation: The agent must inspect the Cube metadata catalog before executing a query to map user business terms (e.g., "sales" or "turnover") to certified semantic definitions (sales.total_revenue).
+FR-3.3 Out-of-Scope Rejection: The system shall politely decline prompts unrelated to business analytics or available lakehouse metrics.
+FR-4: Agent Orchestration & ReAct Execution Loop
+FR-4.1 State Machine Routing: The system shall use LangGraph to execute a three-step deterministic graph:
+get_catalog: Fetch available metrics, dimensions, and descriptions from Cube.
+execute_query: Post the structured JSON metric request to Cube's load endpoint.
+synthesize_spec: Map returned tidy JSON data into a valid Vega-Lite visualization spec.
+FR-4.2 Error Self-Correction: If the generated visualization specification fails schema validation, the agent must automatically retry spec generation up to two times before presenting an error to the user.
+FR-5: Dynamic Visual Canvas & Dashboard Rendering
+FR-5.1 Declarative Chart Compilation: The frontend canvas must render chart widgets dynamically from Vega-Lite JSON specs without requiring custom, hardcoded React chart components.
+FR-5.2 Core Chart Support: The canvas must support automatic spec synthesis for:
+Vertical and horizontal Bar Charts
+Multi-series Line / Time-Series Charts
+Stacked Area Charts
+Single-Value KPI Cards
+FR-5.3 Conversational Spec Modifications: The user shall be able to modify visual layouts (e.g., "Change chart to a line graph") via prompt, updating the Vega-Lite JSON specification without re-querying the backend database.
+FR-5.4 Drag-and-Drop Layout: Generated chart widgets must mount inside an interactive grid (react-grid-layout) where users can resize, reorder, or close widgets.
+FR-6: Parallel BI Validation Engine
+FR-6.1 Metabase SQL Connection: The system shall run Metabase Community Edition connected to Cube Core's Postgres SQL endpoint.
+FR-6.2 Cross-Validation: Users must be able to build a standard drag-and-drop dashboard in Metabase over the same metrics queried by the conversational AI agent to visually confirm single-source governance.
+3. End-to-End Functional Query Workflow
+User Submits Conversational Prompt
+User Interface
+The user enters a question into the Next.js chat interface: "Show me monthly revenue by region for 2025."
+Catalog Inspection & Query Structuring
+LangGraph Agent
+Agent executes get_catalog tool to read Cube schema definitions.
+Agent maps "monthly revenue" to measure sales.total_revenue and time dimension sales.created_at (granularity: month).
+Agent maps "region" to dimension sales.region.
+Data Retrieval & Aggregation
+Cube Semantic Engine
+Agent posts JSON metric request to Cube REST API (http://cube:4000/cubejs-api/v1/load).
+Cube executes SQL against local DuckDB Parquet files and returns a structured tidy JSON data array.
+Vega-Lite Spec Synthesis
+LLM Visualization Engine
+The agent passes data column types and array payload to the LLM, which returns a structured Vega-Lite JSON spec matching the requested time-series breakdown.
+Widget Mounting & User Feedback
+Dashboard Canvas
+Next.js receives the { data, spec } payload and mounts a new widget inside the canvas grid using <Vega>.
+A brief 2-sentence key insight summary is displayed below the chart widget.
+4. AIDLC Acceptance Gate Criteria
+To mark the Functional PoC complete under the AI-Driven Lifecycle (AIDLC) methodology, the system must pass these three acceptance criteria:
+
+Gate 1 (E2E Functional Flow): A user prompt successfully executes through the DuckDB \rightarrow Cube \rightarrow LangGraph \rightarrow Vega-Lite \rightarrow Next.js pipeline in under 3.5 seconds.
+Gate 2 (Zero Hardcoded Charts): The frontend canvas renders bar, line, and area charts purely by interpreting incoming Vega-Lite JSON payloads.
+Gate 3 (Metric Parity): The metric values displayed on the AI Canvas match the numbers displayed in Metabase for identical dimension filters.
+
+
+
+On Mon, 28 Sep 2026 at 6:37 am, Bina Prajapati <bins.prajapati@gmail.com> wrote:
+
+
+Following up on our architecture discussions for the upcoming Agentic BI & Headless Semantic Layer Proof of Concept (PoC), I have drafted the complete Technical Requirements Document (TRD) for your review.
+
+This PoC focuses on demonstrating an end-to-end, 100% open-source pipeline that enables natural language dashboard generation over a local Lakehouse Gold layer while maintaining single-source metric governance.
+
+Executive Summary & Architectural Stack
+The architecture decouples metric governance, reasoning, and visual rendering across six lightweight components:
+
+Storage & Engine: DuckDB reading local Gold Parquet/Delta files.
+Headless Semantic Layer: Cube Core defining metrics as code (OSI-aligned) and serving them via REST, Postgres SQL, and MCP endpoints.
+Agent Orchestration: LangGraph (Python) driving the catalog search, query execution, and chart spec generation control loop.
+LLM Brain: Local Ollama (qwen2.5-coder:7b) with fallback support for OpenAI (gpt-4o-mini).
+Dashboard Canvas: Next.js + react-vega dynamically compiling declarative Vega-Lite JSON specs into interactive SVG/Canvas charts.
+Traditional BI Comparison: Metabase (Community Edition) connected directly to Cube via its Postgres SQL API to prove metric consistency across both traditional and AI interfaces.
+Core Objectives Covered in the TRD
+Zero Custom Rendering Code: The frontend canvas renders charts purely from declarative Vega-Lite JSON specs generated by the agent.
+Dual-Consumer Validation: Demonstrates that both an AI chat agent and traditional BI dashboards (Metabase) yield identical numeric results from the shared Cube semantic layer.
+Turnkey Local Deployment: The entire stack is containerized to run locally via a single docker-compose.yml file with zero cloud dependencies.

@@ -1,0 +1,8 @@
+pyproject.toml
+src/agentic_bi_p1_u1.egg-info/PKG-INFO
+src/agentic_bi_p1_u1.egg-info/SOURCES.txt
+src/agentic_bi_p1_u1.egg-info/dependency_links.txt
+src/agentic_bi_p1_u1.egg-info/requires.txt
+src/agentic_bi_p1_u1.egg-info/top_level.txt
+src/p1_u1/__init__.py
+src/p1_u1/__main__.py

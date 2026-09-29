@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentic-bi-p1-u1"
+version = "0.1.0"
+description = "Deterministic synthetic e-commerce source generator for Agentic BI Phase 1"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=9,<10"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/p1_u2", "tests/p1_u3", "tests/p1_u4"]
+addopts = "-ra"

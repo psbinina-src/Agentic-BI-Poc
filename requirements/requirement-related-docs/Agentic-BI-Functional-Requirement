@@ -1,0 +1,96 @@
+Functional Requirements Document (FRD)
+Project: Rapid E2E Agentic BI Proof of Concept (AIDLC)
+1. Document Scope & Architectural Overview
+This Functional Requirements Document (FRD) outlines the user-facing behaviors, operational capabilities, and core functional features required to deliver a rapid End-to-End (E2E) Proof of Concept (PoC) for an Agentic BI Dashboard.
+
+The architecture strictly uses 100% open-source software for storage, semantic modeling, visualization, and traditional BI, with an optional cloud LLM API (e.g., OpenAI gpt-4o-mini) for fast execution without local GPU configuration.
+
+Functional Layer	Technology Selection	Open Source Status	PoC Role
+Storage & Query Engine	DuckDB	100% Open Source	In-process OLAP reading local Parquet/Delta files.
+Headless Semantic Layer	Cube Core	100% Open Source (Apache 2.0)	Governs metrics; exposes REST, Postgres SQL, and MCP.
+Agent Framework	LangGraph (Python)	100% Open Source	Manages the ReAct loop (Catalog \rightarrow Query \rightarrow Viz Spec).
+LLM Brain	OpenAI API / Ollama	Optional (Cloud API vs. Open Weight)	Cloud API (gpt-4o-mini) for rapid setup, or Ollama (qwen2.5-coder) for local.
+Dashboard Canvas	Next.js + react-vega	100% Open Source	Dynamic grid layout rendering declarative Vega-Lite JSON.
+Traditional BI	Metabase Community	100% Open Source	Connects to Cube via Postgres SQL API for metric validation.
+2. Functional Requirements Breakdown
+FR-1: Lakehouse Storage & Engine
+FR-1.1 Data Querying: The system shall read analytical Gold-layer Parquet or Delta Lake files directly from local storage using DuckDB without requiring a cloud data warehouse.
+FR-1.2 Query Speed: The underlying storage engine must execute metric aggregations over local files in under 500 milliseconds for prompt execution speed.
+FR-2: Metric Governance & Multi-Interface Serving
+FR-2.1 Code-First Modeling: Metric definitions, dimensions, joins, and filters must be configured in version-controlled YAML schema files using Cube Core.
+FR-2.2 Multi-Protocol API:
+Must serve a REST API for the AI Agent to perform catalog discovery and retrieve structured JSON data.
+Must serve a Postgres SQL API on port 15432 for traditional BI connections.
+Must expose MCP (Model Context Protocol) endpoints for native agent integration.
+FR-2.3 Metric Consistency: The system must guarantee that a metric request yields identical numeric outputs regardless of whether it is queried via the REST API or the SQL API.
+FR-3: Natural Language Querying & Catalog Resolution
+FR-3.1 Natural Language Parsing: The agent backend shall accept plain-English analytical prompts from the user interface.
+FR-3.2 Catalog Disambiguation: The agent must inspect the Cube metadata catalog before executing a query to map user business terms (e.g., "sales" or "turnover") to certified semantic definitions (sales.total_revenue).
+FR-3.3 Out-of-Scope Rejection: The system shall politely decline prompts unrelated to business analytics or available lakehouse metrics.
+FR-4: Agent Orchestration & ReAct Execution Loop
+FR-4.1 State Machine Routing: The system shall use LangGraph to execute a three-step deterministic graph:
+get_catalog: Fetch available metrics, dimensions, and descriptions from Cube.
+execute_query: Post the structured JSON metric request to Cube's load endpoint.
+synthesize_spec: Map returned tidy JSON data into a valid Vega-Lite visualization spec.
+FR-4.2 Error Self-Correction: If the generated visualization specification fails schema validation, the agent must automatically retry spec generation up to two times before presenting an error to the user.
+FR-5: Dynamic Visual Canvas & Dashboard Rendering
+FR-5.1 Declarative Chart Compilation: The frontend canvas must render chart widgets dynamically from Vega-Lite JSON specs without requiring custom, hardcoded React chart components.
+FR-5.2 Core Chart Support: The canvas must support automatic spec synthesis for:
+Vertical and horizontal Bar Charts
+Multi-series Line / Time-Series Charts
+Stacked Area Charts
+Single-Value KPI Cards
+FR-5.3 Conversational Spec Modifications: The user shall be able to modify visual layouts (e.g., "Change chart to a line graph") via prompt, updating the Vega-Lite JSON specification without re-querying the backend database.
+FR-5.4 Drag-and-Drop Layout: Generated chart widgets must mount inside an interactive grid (react-grid-layout) where users can resize, reorder, or close widgets.
+FR-6: Parallel BI Validation Engine
+FR-6.1 Metabase SQL Connection: The system shall run Metabase Community Edition connected to Cube Core's Postgres SQL endpoint.
+FR-6.2 Cross-Validation: Users must be able to build a standard drag-and-drop dashboard in Metabase over the same metrics queried by the conversational AI agent to visually confirm single-source governance.
+3. End-to-End Functional Query Workflow
+User Submits Conversational Prompt
+User Interface
+The user enters a question into the Next.js chat interface: "Show me monthly revenue by region for 2025."
+Catalog Inspection & Query Structuring
+LangGraph Agent
+Agent executes get_catalog tool to read Cube schema definitions.
+Agent maps "monthly revenue" to measure sales.total_revenue and time dimension sales.created_at (granularity: month).
+Agent maps "region" to dimension sales.region.
+Data Retrieval & Aggregation
+Cube Semantic Engine
+Agent posts JSON metric request to Cube REST API (http://cube:4000/cubejs-api/v1/load).
+Cube executes SQL against local DuckDB Parquet files and returns a structured tidy JSON data array.
+Vega-Lite Spec Synthesis
+LLM Visualization Engine
+The agent passes data column types and array payload to the LLM, which returns a structured Vega-Lite JSON spec matching the requested time-series breakdown.
+Widget Mounting & User Feedback
+Dashboard Canvas
+Next.js receives the { data, spec } payload and mounts a new widget inside the canvas grid using <Vega>.
+A brief 2-sentence key insight summary is displayed below the chart widget.
+4. AIDLC Acceptance Gate Criteria
+To mark the Functional PoC complete under the AI-Driven Lifecycle (AIDLC) methodology, the system must pass these three acceptance criteria:
+
+Gate 1 (E2E Functional Flow): A user prompt successfully executes through the DuckDB \rightarrow Cube \rightarrow LangGraph \rightarrow Vega-Lite \rightarrow Next.js pipeline in under 3.5 seconds.
+Gate 2 (Zero Hardcoded Charts): The frontend canvas renders bar, line, and area charts purely by interpreting incoming Vega-Lite JSON payloads.
+Gate 3 (Metric Parity): The metric values displayed on the AI Canvas match the numbers displayed in Metabase for identical dimension filters.
+
+
+
+On Mon, 28 Sep 2026 at 6:37 am, Bina Prajapati <bins.prajapati@gmail.com> wrote:
+
+
+Following up on our architecture discussions for the upcoming Agentic BI & Headless Semantic Layer Proof of Concept (PoC), I have drafted the complete Technical Requirements Document (TRD) for your review.
+
+This PoC focuses on demonstrating an end-to-end, 100% open-source pipeline that enables natural language dashboard generation over a local Lakehouse Gold layer while maintaining single-source metric governance.
+
+Executive Summary & Architectural Stack
+The architecture decouples metric governance, reasoning, and visual rendering across six lightweight components:
+
+Storage & Engine: DuckDB reading local Gold Parquet/Delta files.
+Headless Semantic Layer: Cube Core defining metrics as code (OSI-aligned) and serving them via REST, Postgres SQL, and MCP endpoints.
+Agent Orchestration: LangGraph (Python) driving the catalog search, query execution, and chart spec generation control loop.
+LLM Brain: Local Ollama (qwen2.5-coder:7b) with fallback support for OpenAI (gpt-4o-mini).
+Dashboard Canvas: Next.js + react-vega dynamically compiling declarative Vega-Lite JSON specs into interactive SVG/Canvas charts.
+Traditional BI Comparison: Metabase (Community Edition) connected directly to Cube via its Postgres SQL API to prove metric consistency across both traditional and AI interfaces.
+Core Objectives Covered in the TRD
+Zero Custom Rendering Code: The frontend canvas renders charts purely from declarative Vega-Lite JSON specs generated by the agent.
+Dual-Consumer Validation: Demonstrates that both an AI chat agent and traditional BI dashboards (Metabase) yield identical numeric results from the shared Cube semantic layer.
+Turnkey Local Deployment: The entire stack is containerized to run locally via a single docker-compose.yml file with zero cloud dependencies.

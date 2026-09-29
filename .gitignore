@@ -1,0 +1,16 @@
+# Python bytecode and local environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Test and coverage output
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Generated local lakehouse data (never commit runtime datasets)
+lakehouse/source/
+lakehouse/bronze/
+lakehouse/silver/
+lakehouse/gold/

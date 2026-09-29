@@ -1,0 +1,8 @@
+[generator]
+seed = 42
+start_date = "2023-01-01"
+end_date = "2025-12-31"
+customer_count = 10000
+product_count = 1000
+order_line_count = 100000
+output_dir = "lakehouse/source"
